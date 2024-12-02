@@ -302,4 +302,8 @@
     & .hide {
         display: none;
     }
+    & .row-label {
+        font-size: 12px;
+        fill: #555; /* Цвет текста */
+    }
 }

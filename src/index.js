@@ -17,7 +17,7 @@ const VIEW_MODE = {
 };
 
 const VIEW_MODE_PADDING = {
-    HOUR: ['7d', '7d'],
+    HOUR: ['0d', '1d'],
     QUARTER_DAY: ['7d', '7d'],
     HALF_DAY: ['7d', '7d'],
     DAY: ['1m', '1m'],
@@ -47,6 +47,7 @@ const DEFAULT_OPTIONS = {
     highlight_weekend: true,
     scroll_to: 'start',
     lines: 'both',
+    title_padding: 100,
     auto_move_label: true,
     today_button: true,
     view_mode_select: false,
@@ -164,6 +165,9 @@ export default class Gantt {
 
             // cache index
             task._index = i;
+            if (typeof task.row_id === 'number') {
+                task._index = task.row_id;
+            }
 
             // invalid dates
             if (!task.start && !task.end) {
@@ -183,6 +187,9 @@ export default class Gantt {
             // if hours is not set, assume the last day is full day
             // e.g: 2018-09-09 becomes 2018-09-09 23:59:59
             const task_end_values = date_utils.get_date_values(task._end);
+            console.log(task_end_values);
+            console.log(task_end_values.slice(3).every((d) => d === 0));
+
             if (task_end_values.slice(3).every((d) => d === 0)) {
                 task._end = date_utils.add(task._end, 24, 'hour');
             }
@@ -212,6 +219,8 @@ export default class Gantt {
             } else {
                 task.id = `${task.id}`;
             }
+
+            console.log('tasK: ', task);
 
             return task;
         });
@@ -450,7 +459,7 @@ export default class Gantt {
         });
 
         $.attr(this.$svg, {
-            height: grid_height + this.options.padding + 100,
+            height: grid_height + this.options.padding,
             width: '100%',
         });
     }
@@ -482,15 +491,18 @@ export default class Gantt {
     // }
     make_grid_rows() {
         let counter_rows = 0;
-        const distinctRows = [...new Set(this.tasks.map(x => x.row_id))];
-        for (let row of distinctRows){
+        const distinctRows = [...new Set(this.tasks.map((x) => x.row_id))];
+        for (let row of distinctRows) {
             counter_rows = counter_rows + 1;
         }
-        
-        console.log(counter_rows + " unique rows")
 
+        console.log(counter_rows + ' unique rows');
+        // while (this.layers.grid.firstChild) {
+        //     this.layers.grid.removeChild(this.layers.grid.firstChild);
+        // }
         const rows_layer = createSVG('g', { append_to: this.layers.grid });
         const lines_layer = createSVG('g', { append_to: this.layers.grid });
+        // const labels_layer = createSVG('g', { append_to: this.layers.grid });
         const row_width = this.dates.length * this.options.column_width;
         const row_height = this.options.bar_height + this.options.padding;
 
@@ -498,19 +510,13 @@ export default class Gantt {
         //var counter = 0;
 
         for (let row of distinctRows) {
-            // console.log("for each log");
-            // console.log(counter);
-            // counter = counter + 1;
-            // console.log(counter);
-            // console.log('row id:' + task.row_id)
-
             createSVG('rect', {
                 x: 0,
                 y: row_y,
                 width: row_width,
                 height: row_height,
                 class: 'grid-row',
-                append_to: rows_layer
+                append_to: rows_layer,
             });
 
             createSVG('line', {
@@ -519,11 +525,39 @@ export default class Gantt {
                 x2: row_width,
                 y2: row_y + row_height,
                 class: 'row-line',
-                append_to: lines_layer
+                append_to: lines_layer,
             });
+
+            // createSVG('text', {
+            //     x: 30, // Позиция текста (левее прямоугольников)
+            //     y: row_y + row_height / 2, // Центрируем текст относительно рядка
+            //     class: 'row-label', // Добавляем CSS-класс для стилизации
+            //     'text-anchor': 'end', // Выравнивание текста по правому краю
+            //     'dominant-baseline': 'middle', // Центрируем текст по вертикали
+            //     append_to: rows_layer,
+            //     innerHTML: 'pizzs', // Текстовое содержимое (название рядка)
+            // });
 
             row_y += this.options.bar_height + this.options.padding;
         }
+
+        //TODO: title
+        // const parent_element = this.$svg.parentElement;
+        // let $title = document.createElement('div');
+        // for (const element of distinctRows) {
+        //     let $test = document.createElement('p');
+        //     $test.innerHTML = element;
+        //     $title.appendChild($test);
+        // }
+
+        // parent_element.appendChild($title);
+        // this.$container.appendChild($title);
+
+        const total_rows_height =
+            distinctRows.length *
+            (this.options.bar_height + this.options.padding + 7);
+        const total_height = this.options.header_height + total_rows_height;
+        this.$svg.setAttribute('height', total_height);
     }
 
     make_grid_header() {
@@ -734,13 +768,14 @@ export default class Gantt {
     }
 
     /**
-    * Compute the horizontal x-axis distance and associated date for the current date and view.
-    * 
-    * @returns Object containing the x-axis distance and date of the current date, or null if the current date is out of the gantt range.
-    */
+     * Compute the horizontal x-axis distance and associated date for the current date and view.
+     *
+     * @returns Object containing the x-axis distance and date of the current date, or null if the current date is out of the gantt range.
+     */
     computeGridHighlightDimensions(view_mode) {
         const todayDate = new Date();
-        if (todayDate < this.gantt_start || todayDate > this.gantt_end) return null;
+        if (todayDate < this.gantt_start || todayDate > this.gantt_end)
+            return null;
 
         let x = this.options.column_width / 2;
 
@@ -791,7 +826,9 @@ export default class Gantt {
             this.view_is(VIEW_MODE.YEAR)
         ) {
             // Used as we must find the _end_ of session if view is not Day
-            const highlightDimensions = this.computeGridHighlightDimensions(this.options.view_mode);
+            const highlightDimensions = this.computeGridHighlightDimensions(
+                this.options.view_mode,
+            );
             if (!highlightDimensions) return;
             const { x: left, date } = highlightDimensions;
             if (!this.dates.find((d) => d.getTime() == date.getTime())) return;
@@ -1118,7 +1155,8 @@ export default class Gantt {
     }
 
     set_width() {
-        const cur_width = this.$svg.getBoundingClientRect().width;
+        const padding = 100;
+        const cur_width = this.$svg.getBoundingClientRect().width + padding;
         const actual_width = this.$svg.querySelector('.grid .grid-row')
             ? this.$svg.querySelector('.grid .grid-row').getAttribute('width')
             : 0;

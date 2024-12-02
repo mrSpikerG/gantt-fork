@@ -51,8 +51,10 @@ export default {
                     time_parts[3] = '0.' + time_parts[3];
                     time_parts[3] = parseFloat(time_parts[3]) * 1000;
                 }
-                vals = vals.concat(time_parts);
+                vals = vals.concat(time_parts.map(item=>parseInt(item)));
             }
+            console.log(...vals);
+            
             return new Date(...vals);
         }
     },
